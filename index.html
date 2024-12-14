@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Kata-kata Islami</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+</head>
+
+<body class="min-h-screen flex items-center justify-center" style="font-family: 'Poppins', sans-serif;">
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-2xl mx-auto">
+            <h1 class="text-4xl font-bold text-center text-emerald-800 mb-8">Kata-kata Islami</h1>
+
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="topic">
+                        Topik
+                    </label>
+                    <input type="text" id="topic"
+                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                        placeholder="Contoh: kesabaran, syukur, tawakkal">
+                </div>
+
+                <button onclick="generateQuote()"
+                    class="bg-white shadow-sm hover:shadow-md text-black py-2 px-4 rounded w-full transition duration-300">
+                    Generate
+                </button>
+            </div>
+
+            <div id="loading" class="hidden">
+                <div class="flex justify-center items-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-700"></div>
+                </div>
+            </div>
+
+            <div id="quoteContainer" class="hidden bg-white rounded-lg shadow-lg p-6">
+                <div class="mb-4">
+                    <h2 id="quoteTopic" class="text-xl font-bold text-emerald-800 mb-3"></h2>
+                    <div id="quoteText" class="text-lg text-gray-800 space-y-2"></div>
+                </div>
+                <div class="flex justify-center">
+                    <button onclick="copyToClipboard()"
+                        class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold py-2 px-4 rounded transition duration-300">
+                        Salin Teks
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'AIzaSyBQfEURutwQkHaLdu8Nxe4jzgqxXP_8URg'; // Ganti dengan API key Anda
+        const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+
+        function formatMarkdownToHtml(text) {
+            text = text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+
+            return text
+                .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+                .replace(/__(.*?)__/g, "<strong>$1</strong>")
+                .replace(/\*(.*?)\*/g, "<em>$1</em>")
+                .replace(/_(.*?)_/g, "<em>$1</em>")
+                .replace(/~~(.*?)~~/g, "<del>$1</del>")
+                .replace(/\n/g, "<br>");
+        }
+
+        async function generateQuote() {
+            const topic = document.getElementById('topic').value;
+            if (!topic) {
+                alert('Silakan masukkan topik terlebih dahulu');
+                return;
+            }
+
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('quoteContainer').classList.add('hidden');
+
+            const prompt = `Buatkan 3 kata-kata islami yang menginspirasi tentang ${topic}. 
+                          Format output:
+                          Topik: ${topic}
+                          1. [kata-kata pertama]
+                          2. [kata-kata kedua]
+                          3. [kata-kata ketiga]
+
+                          Gunakan format markdown:
+                          - **teks** untuk bold
+                          - *teks* untuk italic
+                          
+                          Setiap kata-kata harus disertai dengan referensi dari Al-Quran atau Hadits jika ada.
+                          Berikan dalam bahasa Indonesia yang gaul dan keren agar lebih masuk untuk kalangan muda.`;
+
+            try {
+                const response = await fetch(`${API_URL}?key=${API_KEY}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{
+                                text: prompt
+                            }]
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+
+                document.getElementById('loading').classList.add('hidden');
+
+                if (data.candidates && data.candidates[0].content.parts[0].text) {
+                    const quote = data.candidates[0].content.parts[0].text;
+                    const lines = quote.split('\n');
+
+                    const topicLine = lines[0];
+                    document.getElementById('quoteTopic').innerHTML = formatMarkdownToHtml(topicLine);
+
+                    const quoteContainer = document.getElementById('quoteText');
+                    quoteContainer.innerHTML = '';
+
+                    lines.slice(1).forEach(line => {
+                        if (line.trim()) {
+                            const p = document.createElement('p');
+                            p.innerHTML = formatMarkdownToHtml(line);
+                            quoteContainer.appendChild(p);
+                        }
+                    });
+
+                    document.getElementById('quoteContainer').classList.remove('hidden');
+                } else {
+                    throw new Error('Gagal mendapatkan respons yang valid');
+                }
+            } catch (error) {
+                alert('Terjadi kesalahan saat generate kata-kata. Silakan coba lagi.');
+                console.error('Error:', error);
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        function copyToClipboard() {
+            const topic = document.getElementById('quoteTopic').textContent;
+            const quotes = document.getElementById('quoteText').innerText;
+            const fullText = `${topic}\n${quotes}`;
+
+            navigator.clipboard.writeText(fullText)
+                .then(() => {
+                    alert('Teks berhasil disalin!');
+                })
+                .catch(err => {
+                    console.error('Gagal menyalin teks:', err);
+                    alert('Gagal menyalin teks');
+                });
+        }
+    </script>
+</body>
+
+</html>
